@@ -1,0 +1,56 @@
+import pandas as pd
+import sqlite3 as sq
+from sqlite3 import Error
+
+def createcon(dataname):
+    
+    con=None
+    try:
+        con=sq.connect(dataname)
+        return con
+    except Error as e:
+        print(e)
+    return con
+        
+con=createcon('pressure_data.db') 
+
+
+def create_table(con, sql):
+    
+    try:
+        c = con.cursor()
+        c.execute(sql)
+    except Error as e:
+        print(e)
+        
+table_sql= """ create table if not exists Experiment(
+item integer PRIMARY KEY,
+Time datetime,
+sensor1 integer,
+sensor2 integer,
+sensor3 integer,
+sensor4 integer,
+sensor5 integer,
+sensor6 integer);
+"""
+
+
+if con is not None:
+    create_table(con,table_sql)
+
+else:
+    print("Error! cannot create the database connection.")
+        
+def insert_table(con,experiment,sql):
+    c= con.cursor()
+    c.execute(sql,experiment)
+    con.commit()
+    return c.lastrowid
+    
+experiment_sql=""" INSERT INTO experiment (Time,sensor1,sensor2,sensor3,sensor4,sensor5,sensor6) VALUES(?,?,?,?,?,?,?)""" 
+df=pd.read_csv('ex02.csv')  
+
+for index, row in df.iterrows():
+    dd=(row.Time,row.Sensor1,row.Sensor2,row.Sensor3,row.Sensor4,row.Sensor5,row.Sensor6)
+    insert_table(con,dd,experiment_sql)
+
