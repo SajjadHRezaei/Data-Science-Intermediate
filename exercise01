@@ -15,3 +15,85 @@ external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 rw=pd.read_csv('winequality-red.csv',sep=';')
 ww=pd.read_csv('winequality-white.csv',sep=';')
+
+app.layout=html.Div([
+    html.Div([    html.H2(
+        children=['X axis'],
+        style={
+            'textAlign': 'left',
+            'color': colors['text']
+        }),    html.H2(
+        children=['Y axis'],
+        style={
+            'textAlign': 'left',
+            'color': colors['text']
+        })],style={'columnCount': 2}),
+
+
+    html.Div([ dcc.Dropdown(
+                id='xaxis-column',
+                options=[{'label': i, 'value': i} for i in rw.keys()],
+                value=str(rw.keys()[0])
+            ),  html.H3(children=['Red Wine'], style={'textAlign': 'center','Font':"Times New Roman" ,'color': "blue"})
+                ,dcc.Graph(id='redwine-graphic') ],style={'width': '45%', 'display': 'inline-block'}),
+    html.Div([dcc.Dropdown(
+                id='yaxis-column',
+                options=[{'label': i, 'value': i} for i in rw.keys()],
+                value=str(rw.keys()[1])
+            ),  html.H3(children=['White Wine'], style={'textAlign': 'center','Font':"Times New Roman" ,'color': "blue"}),dcc.Graph(id='whitewine-graphic') ],style={'width': '48%' , 'float': 'right', 'display': 'inline-block'}),
+    html.Div([   html.Label('Data Sampeling Ratio',style={'color': colors['background']}),dcc.Input(
+        id='num-rate',
+        type='number',
+        value=90
+    ),    html.Label('Select Maximum Quality',style={'color': colors['background']}),   dcc.Slider(
+        id='quality-slider',
+        min=ww['quality'].min(),
+        max=ww['quality'].max(),
+        value=ww['quality'].max(),
+        marks={str(quality): str(quality) for quality in ww['quality'].unique()},
+        step=None
+    )])
+    
+    ])
+
+
+@app.callback(
+    Output('redwine-graphic', 'figure'),
+    Output('whitewine-graphic', 'figure'),
+    Input('xaxis-column', 'value'),
+    Input('yaxis-column', 'value'),
+    Input('quality-slider', 'value'), 
+    State('num-rate', 'value'))
+
+def graf_update(x_axis,y_axis,quality_slider,data_rate):
+    
+    rate=int(data_rate)/100
+    new_rw=rw[rw['quality']<=quality_slider].sample(frac=rate)
+    new_ww=ww[ww['quality']<=quality_slider].sample(frac=rate)
+    
+    rwfig=px.scatter(new_rw,x=str(x_axis),y=str(y_axis),color='quality')
+    
+    rwfig.update_layout(margin={'l': 40, 'b': 40, 't': 10, 'r': 0},
+                        font_family="Times New Roman", hovermode='closest')
+
+    rwfig.update_xaxes(title=str(x_axis), type='linear',title_font_size=28,title_font_color="blue" )
+
+    rwfig.update_yaxes(title=str(y_axis), type='linear',title_font_size=28,title_font_color="blue")
+
+
+
+    wwfig=px.scatter(new_ww,x=str(x_axis),y=str(y_axis),color='quality')
+    
+    wwfig.update_layout(margin={'l': 40, 'b': 40, 't': 10, 'r': 0},font_family="Times New Roman", hovermode='closest')
+
+    wwfig.update_xaxes(title=str(x_axis), type='linear',title_font_size=28,title_font_color="blue" )
+
+    wwfig.update_yaxes(title=str(y_axis), type='linear',title_font_size=28,title_font_color="blue")    
+    
+    return rwfig,wwfig
+
+
+
+
+if __name__ == '__main__':
+    app.run_server(debug=True)
