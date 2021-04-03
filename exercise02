@@ -54,3 +54,57 @@ for index, row in df.iterrows():
     dd=(row.Time,row.Sensor1,row.Sensor2,row.Sensor3,row.Sensor4,row.Sensor5,row.Sensor6)
     insert_table(con,dd,experiment_sql)
 
+import pandas as pd
+
+
+try:
+    SQL_Query = pd.read_sql_query(
+        '''select
+          item,
+          Time,
+          sensor1,
+          sensor2,
+          sensor3,
+          sensor4,
+          sensor5,
+          sensor6
+          from experiment''',con)
+
+    dff = pd.DataFrame(SQL_Query, columns=['item', 'Time', 'sensor1', 'sensor2', 'sensor3', 'sensor4', 'sensor5', 'sensor6'])
+
+except:
+    print("Error: unable to convert the data")
+
+dff.to_csv('data_pressure',index=False)
+
+data=pd.read_csv('data_pressure')
+data['avg']=data.iloc[:,2:8].mean(axis=1).round(2)
+data['avg_smooth']=data.avg.rolling(5).mean().round(2)
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+
+fig = make_subplots(specs=[[{"secondary_y": True}]])
+
+fig.add_trace(
+    go.Scatter(x=data["Time"], y=data['avg_smooth'],name="Pressure"),
+    secondary_y=False,
+)
+
+fig.add_trace(
+    go.Scatter(x=data["Time"], y=data['avg_smooth'].diff(), name="Derivative"),
+    secondary_y=True,
+)
+
+
+fig.update_layout(
+    title_text="Pressure Sensor Analysis"
+)
+
+
+fig.update_xaxes(title_text="<b>Time</b>")
+
+
+fig.update_yaxes(title_text="<b>Sensor Value</b>", secondary_y=False)
+fig.update_yaxes(title_text="<b>Derivative</b>", secondary_y=True)
+
+fig.show()
