@@ -1,0 +1,132 @@
+# data analysis and wrangling
+import pandas as pd
+import numpy as np
+import random as rnd
+
+# visualization
+import seaborn as sns
+import matplotlib.pyplot as plt
+%matplotlib inline
+
+# machine learning
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC, LinearSVC
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.naive_bayes import GaussianNB
+from sklearn.linear_model import Perceptron
+from sklearn.linear_model import SGDClassifier
+from sklearn.tree import DecisionTreeClassifier
+#--
+#Like the previous tasks start with the data exploration and get insight data. Try to produce
+#task-related information visualization, e.g. distribution of target over age, disease per
+#gender, and etc.
+df = pd.read_csv('heart.csv')
+print(df.columns.values)
+
+print("Percentage of Female Patients is: {:.2f}% and Percentage of Male Patients is: {:.2f}%".format (len(df[df.sex == 0])/(len(df.sex))*100,len(df[df.sex == 1])/(len(df.sex))*100))
+#--
+
+#Which columns do you think are categorical columns? Convert them to numerical
+#columns.
+df.describe(include='all')
+df.info()
+#--
+name=df.keys().drop(['age','chol','trestbps','thalach','target','oldpeak'])
+for i in name:
+    print(df[[i,'target']].groupby([i]).mean().sort_values(by='target', ascending=False))
+#__
+pd.crosstab(df.age,df.target).plot(kind="bar",figsize=(20,6))
+plt.title('Heart Disease Frequency for Ages')
+plt.xlabel('Age')
+plt.ylabel('Frequency')
+plt.savefig('heartDiseaseAndAges.png')
+plt.show()
+
+#explanation:frequnecy of disease is higher between ages 40 and 54. The chance of no disease is highest at 55 to 65.
+#__
+sns.histplot(df, x='oldpeak', hue="target",kde=True)
+fig, axs = plt.subplots(2,2,figsize=(16,9), sharey=True)
+name=['age','chol','trestbps','thalach']
+k=0
+for i in range (2):
+    for j in range(2):
+        #fig.suptitle('histogram figures')
+        sns.histplot(df, x=name[k], hue="target",kde=True,ax=axs[i,j])
+        k+=1
+#___
+# so far we know that sex, cp, slope, and ca are better indications
+# sex: Men are more prone to disease but also more healthy cases are found within men! how is this possible?
+# cp:ok, cp 0 contains the most healthy people.it is chest pain type! probabely it means no chest pain. chest pain type 2 is the best indication of hearth disease.
+# slope: Good: positive correlation: the higher the slope of the peak, the higher the likelihood of the disease.
+# ca: Good: negative correlation-the lower the number of major vessels, the higher the chance of the disease.
+# oldpeak: Good: ST depression induced by exercise relative to rest is lower in people with heart disease.
+# thalach: Good: maximum heart rate achieved is higher in diseased people.
+df
+
+cp = pd.get_dummies(df['cp'], prefix = "cp")
+thal = pd.get_dummies(df['thal'], prefix = "thal")
+slope = pd.get_dummies(df['slope'], prefix = "slope")
+restecg = pd.get_dummies(df['restecg'], prefix = "restecg")
+dfs = [df, cp, thal, slope, restecg]
+df = pd.concat(dfs, axis = 1)
+df.head()
+#__
+from sklearn.model_selection import cross_validate
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+
+x=[2**i for i in range(-5,16)]
+
+X=df.drop(columns = ['target']).values
+Y=df[['target']].values.ravel()
+cv_test_scores=[]
+for c in x:
+    pipeline = make_pipeline(StandardScaler(),SVC(kernel="linear", C=c,max_iter=9000000))
+    cv_results = cross_validate(pipeline,X, Y,scoring='accuracy',cv=5,n_jobs=-1)
+    cv_test_scores.append(cv_results['test_score'].mean().round(2))
+    print('performance for c={} in linear SVR is: {:.2}'.format(c,cv_results['test_score'].mean().round(2)))
+#__
+x1=['2^{}'.format(i)  for i in range (-5,16)]
+plt.figure(figsize=(15,10))
+plt.plot(x1, cv_test_scores)
+plt.title("performance for linear SVR")
+#__
+gama=[]
+for i in range(-15,4):
+    gama.append(2**i)
+    
+x=[]
+for i in range(-5,16):
+    x.append(2**i)
+
+
+
+X=df.drop(columns = ['target']).values
+Y=df[['target']].values.ravel()
+data=[]
+performance=np.zeros([len(x),len(gama)])
+best=0
+for i,c in enumerate(x):
+    for j,g in enumerate(gama):
+        pipeline = make_pipeline(StandardScaler(), SVC(gamma=g, C=c, max_iter=1000000))
+        cv_results = cross_validate(pipeline,X, Y,scoring='accuracy',cv=5,n_jobs=-1)
+        data.append(cv_results['test_score'].mean())
+        ans=cv_results['test_score'].mean()
+        performance[i,j]=ans
+        if ans>best:
+            best=ans
+            best_gama=g
+            best_c=c
+            
+print('the best value for gamma is: {:.4}'.format(best_gama))
+print('the best value for C is: {}'.format(best_c))
+print('the best performance in SVR with RBF kernel is is: {:.4}'.format(best))
+#__
+import plotly.express as px
+l=[]
+data_new=np.array(data).reshape(21,19)
+l.append(data_new)
+fig=px.imshow(data_new, x=['2^{}'.format(i)  for i in range (-15,4)], y=['2^{}'.format(i)  for i in range (-5,16)],
+              labels=dict(color='Acc', x='Gamma',y='C'))
+fig.show()
