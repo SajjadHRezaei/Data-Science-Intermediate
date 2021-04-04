@@ -1,0 +1,69 @@
+import numpy as np
+import pandas as pd
+import plotly.express as px
+from sklearn import cluster
+from sklearn.cluster import KMeans,SpectralClustering,AgglomerativeClustering
+from sklearn.preprocessing import StandardScaler,MinMaxScaler
+from sklearn.neighbors import kneighbors_graph
+
+num_sample=2000
+x=np.linspace(0,1000,num_sample)
+
+y1=0.001*x + np.random.normal(0, .2, num_sample)
+y2=0.001*x + np.random.normal(0, .2, num_sample) + 2
+
+
+#y = np.random.normal(0, .2, num_sample)
+df1=pd.DataFrame(np.c_[x,y1],columns=['x','y'])
+df1['Target']='A'
+df2=pd.DataFrame(np.c_[x,y2],columns=['x','y'])
+df2['Target']='B'
+df=pd.concat([df1,df2])
+
+    
+cl = KMeans(n_clusters=2, random_state=0)
+cl = SpectralClustering(n_clusters=2,affinity="nearest_neighbors",n_neighbors=5) 
+#cl = AgglomerativeClustering(n_clusters=2, linkage='single')
+scaler=MinMaxScaler()
+df['x']=scaler.fit_transform(df['x'].to_numpy().reshape(-1, 1))
+df['y']=scaler.fit_transform(df['y'].to_numpy().reshape(-1, 1))
+
+
+df['Prediction']=cl.fit_predict(df[['x','y']]) 
+
+df['Prediction']=df['Prediction'].astype(str)
+
+
+fig = px.scatter(df,x='x', y='y',color='Prediction',symbol='Target')
+fig.show()
+
+#--------------------------------------------------------------------
+
+from sklearn.cluster import KMeans
+from sklearn import cluster, datasets, mixture
+import plotly.express as px
+import pandas as pd
+from sklearn.preprocessing import StandardScaler
+
+n_samples = 1500
+data = datasets.make_blobs(n_samples=n_samples,centers=4,cluster_std=[1.5, 2.5, 2.5,1.5],random_state=7)
+df=pd.DataFrame(data=data[0],columns=['x','y'])
+df['label']=data[1]
+kmeans = KMeans(n_clusters=4, random_state=0)
+scaler=StandardScaler()
+df['prediction']=kmeans.fit_predict(scaler.fit_transform(df[['x','y']]))
+df['prediction']=df['prediction'].astype(str)
+df['label']=df['label'].astype(str)
+fig = px.scatter(df, x="x", y="y", color="prediction",symbol='label',color_continuous_scale='ice')
+fig.show()
+
+#--------------------------------------------------------------------
+
+from sklearn import metrics
+
+print('rand_score',metrics.rand_score(df['label'], df['prediction']))
+print('adjusted_rand_score',metrics.adjusted_rand_score(df['label'], df['prediction']))
+print('adjusted_mutual_info_score',metrics.adjusted_mutual_info_score(df['label'], df['prediction']))
+print('normalized_mutual_info_score',metrics.normalized_mutual_info_score(df['label'], df['prediction']))
+print('homogeneity_completeness_v_measure',metrics.homogeneity_completeness_v_measure(df['label'], df['prediction']))
+
