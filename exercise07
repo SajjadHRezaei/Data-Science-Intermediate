@@ -1,0 +1,445 @@
+from sklearn import datasets
+digits = datasets.load_digits()
+print(digits.DESCR)
+
+import pandas as pd
+import numpy as np
+from sklearn.datasets import load_digits
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report
+from sklearn.metrics import confusion_matrix
+from sklearn.decomposition import PCA
+from sklearn.svm import SVC
+from sklearn.model_selection import GridSearchCV
+from sklearn.preprocessing import StandardScaler
+
+digits = load_digits()
+print(digits.data.shape)
+ 
+plt.gray() 
+plt.matshow(digits.images[0]) 
+plt.show()
+
+#-----------------------------------------------------------
+
+from sklearn.metrics import accuracy_score, f1_score, recall_score, average_precision_score
+
+def cal_perf (y_true, y_pred,method):
+    methods=[accuracy_score(y_true, y_pred),
+             f1_score(y_true, y_pred, average='weighted'),recall_score(y_true, y_pred, average='weighted')]
+    names=['accuracy','f1_weighted','recall_weighted']
+    d={'Performance':[],'metric':[],'method':[] }
+    for name,perf in zip(names,methods):
+        d['Performance'].append(perf)
+        d['metric'].append(name)
+        d['method'].append(method)
+        
+    return pd.DataFrame(d)
+    
+X=digits.data
+y=digits.target
+n_samples=len(X)
+n_features=len(digits.feature_names)
+target_names=digits.target_names
+print('list of target names is: ',target_names)
+n_class=len(target_names)
+
+
+_, axes = plt.subplots(nrows=1, ncols=4, figsize=(10, 3))
+for ax, image, label in zip(axes, digits.images, digits.target):
+    ax.set_axis_off()
+    ax.imshow(image, cmap=plt.cm.gray_r, interpolation='nearest')
+    ax.set_title('Training: %i' % label)
+    
+    
+print("Total dataset size:")
+print("n_samples: %d" % n_samples)
+print("n_features: %d" % n_features)
+print("n_classes: %d" % n_class)
+
+#--------------------------------------------------
+
+# split into a training and testing set
+
+best=np.inf
+for i in range(200):
+    X_train0, X_test0, y_train0, y_test0 = train_test_split(X, y, test_size = 0.3, random_state =i)
+    objective_function=0.4*(np.abs(X_train0.mean()-X_test0.mean())+np.abs(y_train0.mean()-y_test0.mean()))
+    + 0.6*(np.abs(X_train0.std()-X_test0.std())+np.abs(y_train0.std()-y_test0.std()))
+    
+    
+    if objective_function<best:
+        best=objective_function
+        index=i
+        X_train, X_test, y_train, y_test =X_train0, X_test0, y_train0, y_test0 
+
+
+print('the best number for random state in range 200 is:{}'.format(index))
+
+#-----------------------------------------------------------------
+
+# Train a SVM classification model
+
+param_grid = {'C': [1e3, 5e3, 1e4, 5e4, 1e5],
+              'gamma': [0.0001, 0.0005, 0.001, 0.005, 0.01, 0.1], }
+clf = GridSearchCV(
+    SVC(kernel='rbf', class_weight='balanced'), param_grid)
+clf = clf.fit(X_train, y_train)
+
+print("Best estimator found by grid search:")
+print(clf.best_estimator_)
+
+#---------------------------------
+
+# Quantitative evaluation of the model quality on the test set
+
+y_pred = clf.predict(X_test)
+
+print(classification_report(y_test, y_pred))
+print(confusion_matrix(y_test, y_pred, labels=range(n_class)))
+df1=cal_perf(y_test, y_pred,'original')
+
+_, axes = plt.subplots(nrows=1, ncols=4, figsize=(10, 3))
+for ax, image, prediction in zip(axes, X_test, y_pred):
+    ax.set_axis_off()
+    image = image.reshape(8, 8)
+    ax.imshow(image, cmap=plt.cm.gray_r, interpolation='nearest')
+    ax.set_title(f'Prediction: {prediction}')
+    
+#-----------------------------------------------
+
+import random
+rate=10 #%
+i=1
+index = [i for i in range(X.shape[0])]
+
+random.shuffle(index)
+index=index[:round(rate*X.shape[0]/100)]
+
+X_new=digits.data[index]
+y_new=digits.target[index]
+n_sample=len(X_new)
+Dispersion=[list(y_new).count(i)/n_sample  for i in range(10)]
+#i=max(Dispersion)-min(Dispersion)
+    
+
+print("n_samples: %d" % n_sample)
+
+#----------------------------------------------
+
+X_train_new, X_test_new, y_train_new, y_test_new= train_test_split(X_new, y_new, test_size = 0.25, random_state =0)
+
+param_grid = {'C': [1e3, 5e3, 1e4, 5e4, 1e5],
+              'gamma': [0.0001, 0.0005, 0.001, 0.005, 0.01, 0.1], }
+clf = GridSearchCV(
+    SVC(kernel='rbf', class_weight='balanced'), param_grid)
+clf = clf.fit(X_train_new, y_train_new)
+
+print("Best estimator found by grid search:")
+print(clf.best_estimator_)
+
+y_pred = clf.predict(X_test_new)
+
+print(classification_report(y_test_new, y_pred))
+print(confusion_matrix(y_test_new, y_pred, labels=range(n_class)))
+
+df2=cal_perf(y_test_new, y_pred,'sample reduction 1')
+
+#---------------------------------------------------------
+
+n_components = 8
+
+pca = PCA(n_components=n_components,svd_solver='full',
+          whiten=True).fit(X_train_new)
+
+X_train_pca = pca.transform(X_train_new)
+X_test_pca = pca.transform(X_test_new)
+
+
+param_grid = {'C': [1e3, 5e3, 1e4, 5e4, 1e5],
+              'gamma': [0.0001, 0.0005, 0.001, 0.005, 0.01, 0.1], }
+clf = GridSearchCV(
+    SVC(kernel='rbf', class_weight='balanced'), param_grid)
+clf = clf.fit(X_train_pca, y_train_new)
+
+print("Best estimator found by grid search:")
+print(clf.best_estimator_)
+
+
+y_pred = clf.predict(X_test_pca)
+
+print(classification_report(y_test_new, y_pred))
+print(confusion_matrix(y_test_new, y_pred, labels=range(n_class)))
+df4=cal_perf(y_test_new, y_pred,'sample & feature reduction ')
+
+#------------------------------------------------------------
+
+from imblearn.over_sampling import SMOTE
+sm = SMOTE(random_state=2)
+
+X_train_res, y_train_res = sm.fit_resample(X_train_pca, y_train_new.ravel())
+
+param_grid = {'C': [1e3, 5e3, 1e4, 5e4, 1e5],
+              'gamma': [0.0001, 0.0005, 0.001, 0.005, 0.01, 0.1], }
+clf = GridSearchCV(
+    SVC(kernel='rbf', class_weight='balanced'), param_grid)
+clf = clf.fit(X_train_res, y_train_res)
+
+print("Best estimator found by grid search:")
+print(clf.best_estimator_)
+
+y_pred = clf.predict(X_test_pca)
+
+print(classification_report(y_test_new, y_pred))
+print(confusion_matrix(y_test_new, y_pred, labels=range(n_class)))
+df5=cal_perf(y_test_new, y_pred,'+ SMOTE')
+
+#------------------------------------------------------------------
+
+import seaborn as sns
+
+df=pd.concat([df1,df2,df3,df4,df5]).reset_index(drop=True)
+fig1 = sns.catplot(data=df,
+                x="method", y="Performance",hue="metric",kind="bar",height=5, aspect=2)
+fig1.set_xticklabels(rotation=90)
+fig1.set(ylim=(0.7, 1))
+
+#----------------------------------------------------------
+
+##Task 2
+
+import pandas as pd
+
+dfw=pd.read_csv('winequality-white.csv', sep=';')
+print('Number of samples: {}'.format(dfw.shape[0]))
+print('Number of features: {}'.format(dfw.shape[1]))
+
+dfw.describe()
+#dfw[dfw['quality']==6].count()
+dfw.info()
+dfw.corr()
+
+#Split the dataset to two groups of wine (two datasets), 'Good quality' when the quality is  larger than 6 and 'Low quality' when the quality is  less than 6.
+
+df_top=dfw[dfw['quality']>6].reset_index(drop=True)
+df_top['target']='Good quality'
+df_low=dfw[dfw['quality']<6].reset_index(drop=True)
+df_low['target']='Low quality'
+df=pd.concat([df_top,df_low]).reset_index(drop=True)
+
+yw = df[['target']].values
+Xw = df.drop(columns=['target','quality']).values
+n_features = Xw.shape[1]
+n_samples= Xw.shape[0]
+
+target_names=['Good quality', 'Low quality']
+n_classes = len(target_names)
+
+print(target_names)
+print("Total dataset size:")
+print("n_samples: %d" % n_samples)
+print("n_features: %d" % n_features)
+print("n_classes: %d" % n_classes)
+
+# split into a training and testing set
+
+Xw_train, Xw_test, yw_train, yw_test = train_test_split(
+    Xw, yw.ravel(), test_size=0.3, random_state=42)
+    
+# Train a SVM classification model
+
+scaler = StandardScaler()
+Xw_train=scaler.fit_transform(Xw_train)
+Xw_test=scaler.transform(Xw_test)
+
+param_grid = {'C': [1e3, 5e3, 1e4, 5e4, 1e5],
+              'gamma': [0.0001, 0.0005, 0.001, 0.005, 0.01, 0.1], }
+
+clf = GridSearchCV(
+    SVC(kernel='rbf', class_weight='balanced'), param_grid)
+clf.fit(Xw_train, yw_train)
+y_pred= clf.predict(Xw_test)
+
+print("Best estimator found by grid search:")
+print(clf.best_estimator_)
+
+# Quantitative evaluation of the model quality on the test set
+
+
+df6=cal_perf(yw_test, y_pred,'Original')
+
+print(classification_report(yw_test, y_pred, target_names=target_names))
+print(confusion_matrix(yw_test, y_pred, labels=['Good quality', 'Low quality']))
+
+# Checking dataset to find out it is balanced or not:
+
+#df.groupby(['target']).count()
+
+df['target'].value_counts()
+# The dataset is  imbalanced
+
+#---------------------------------------------------------
+
+from imblearn.over_sampling import SMOTE
+sm = SMOTE(random_state=42)
+
+X_train_res, y_train_res = sm.fit_resample(Xw_train, yw_train.ravel())
+
+# Train a SVM classification model
+
+print("Fitting the classifier to the training set")
+
+param_grid = {'C': [1e3, 5e3, 1e4, 5e4, 1e5],
+              'gamma': [0.0001, 0.0005, 0.001, 0.005, 0.01, 0.1], }
+clf = GridSearchCV(
+    SVC(kernel='rbf', class_weight='balanced'), param_grid)
+clf = clf.fit(X_train_res, y_train_res)
+
+print("Best estimator found by grid search:")
+print(clf.best_estimator_)
+
+# Quantitative evaluation of the model quality on the test set
+
+y_pred = clf.predict(Xw_test)
+
+df7=cal_perf(yw_test, y_pred,'SMOTE')
+
+print(classification_report(yw_test, y_pred))
+print(confusion_matrix(yw_test, y_pred, labels=['Good quality', 'Low quality']))
+
+#-----------------------------------------------------------------------------------
+
+# split into a training and testing set
+
+X_train_up, X_test_up, y_train_up, y_test_up = train_test_split(
+    Xw, yw.ravel(), test_size=0.3, random_state=42)
+
+dfy=pd.DataFrame(y_train_up, columns=['target'])
+dfy['target'].value_counts()
+dfx=pd.DataFrame(X_train_up, columns=['fixed acidity', 'volatile acidity', 'citric acid', 'residual sugar', 'chlorides',
+                                     'free sulfur dioxide', 'total sulfur dioxide', 'density', 'pH', 'sulphates', 'alcohol'])
+
+dff=pd.concat([dfx,dfy],axis=1)
+dff['target'].value_counts()
+
+from sklearn.utils import resample
+
+df_majority = dff[dff.target=='Low quality']
+df_minority = dff[dff.target=='Good quality']
+
+df_minority_upsampled = resample(df_minority, replace=True,  n_samples=1152, random_state=123)
+df_upsampled = pd.concat([df_majority, df_minority_upsampled])
+df_upsampled.target.value_counts()
+
+yu = df_upsampled.target
+Xu = df_upsampled.drop(columns=['target']).values
+
+# Train a SVM classification model
+
+print("Fitting the classifier to the training set")
+
+param_grid = {'C': [1e3, 5e3, 1e4, 5e4, 1e5],
+              'gamma': [0.0001, 0.0005, 0.001, 0.005, 0.01, 0.1], }
+clf = GridSearchCV(
+    SVC(kernel='rbf', class_weight='balanced'), param_grid)
+clf = clf.fit(Xu, yu)
+
+print("Best estimator found by grid search:")
+print(clf.best_estimator_)
+
+# Quantitative evaluation of the model quality on the test set
+
+y_pred = clf.predict(X_test_up)
+
+df8=cal_perf(y_test_up, y_pred,'Up Sample')
+
+
+
+print(classification_report(y_test_up, y_pred))
+print(confusion_matrix(y_test_up, y_pred, labels=['Good quality', 'Low quality']))
+
+#---------------------------------------------------------------------------------
+
+df_majority = dff[dff.target=='Low quality']
+df_minority = dff[dff.target=='Good quality']
+
+df_majority_downsampled = resample(df_majority, replace=False,  n_samples=738, random_state=123)
+df_downsampled = pd.concat([df_majority_downsampled, df_minority])
+df_downsampled.target.value_counts()
+
+yd = df_downsampled.target
+Xd = df_downsampled.drop(columns=['target']).values
+
+# Train a SVM classification model
+
+print("Fitting the classifier to the training set")
+
+param_grid = {'C': [1e3, 5e3, 1e4, 5e4, 1e5],
+              'gamma': [0.0001, 0.0005, 0.001, 0.005, 0.01, 0.1], }
+clf = GridSearchCV(
+    SVC(kernel='rbf', class_weight='balanced'), param_grid)
+clf = clf.fit(Xd, yd)
+
+print("Best estimator found by grid search:")
+print(clf.best_estimator_)
+
+# Quantitative evaluation of the model quality on the test set
+
+
+y_pred = clf.predict(X_test_up)
+
+df9=cal_perf(y_test_up, y_pred,'Down Sample')
+
+
+print(classification_report(y_test_up, y_pred))
+print(confusion_matrix(y_test_up, y_pred, labels=['Good quality', 'Low quality']))
+
+#-------------------------------------------------------------------------------
+
+df_majority = dff[dff.target=='Low quality']
+df_minority = dff[dff.target=='Good quality']
+
+df_minority_up = resample(df_minority, replace=True,  n_samples=950, random_state=123)
+df_majority_down = resample(df_majority, replace=False,  n_samples=950, random_state=123)
+df_up_downsampled = pd.concat([df_majority_down, df_minority_up])
+df_up_downsampled.target.value_counts()
+
+yud = df_up_downsampled.target
+Xud = df_up_downsampled.drop(columns=['target']).values
+
+# Train a SVM classification model
+
+print("Fitting the classifier to the training set")
+
+param_grid = {'C': [1e3, 5e3, 1e4, 5e4, 1e5],
+              'gamma': [0.0001, 0.0005, 0.001, 0.005, 0.01, 0.1], }
+clf = GridSearchCV(
+    SVC(kernel='rbf', class_weight='balanced'), param_grid)
+clf = clf.fit(Xud, yud)
+
+print("Best estimator found by grid search:")
+print(clf.best_estimator_)
+
+# Quantitative evaluation of the model quality on the test set
+
+
+y_pred = clf.predict(X_test_up)
+
+df10=cal_perf(y_test_up, y_pred,'Up-Down Sample')
+
+
+print(classification_report(y_test_up, y_pred))
+print(confusion_matrix(y_test_up, y_pred, labels=['Good quality', 'Low quality']))
+
+#------------------------------------------------------------------------------
+
+import seaborn as sns
+
+
+dfq=pd.concat([df6,df7,df8,df9,df10]).reset_index(drop=True)
+fig = sns.catplot(data=dfq,
+                x="method", y="Performance",hue="metric",kind="bar",height=5, aspect=2)
+fig.set_xticklabels(rotation=90)
+fig.set(ylim=(0.6, 0.9))
+
