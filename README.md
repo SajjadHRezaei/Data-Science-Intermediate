@@ -1,6 +1,6 @@
 **The structure of folders**
 
-This repository has been created by Champions team in which all members are studying data science in Comemit academy.
+This repository has been created by the Champions team in which all members are studying data science in Comemit academy.
 There are 7 files in this repository which all have been written in python language. The first file which is exercise01,
 is a project in which two wine quality datasets have been visualized by Dash framework. The second file (exercise02) is 
 a project in which the aim of the project is transfering Pandas dataframe to SQL database and  also converting the SQL
